@@ -4,97 +4,70 @@ import numpy as np
 import pandas as pd
 import os
 
-# --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="Yes Bank Price Predictor", layout="centered")
-
-# --- CUSTOM STYLING ---
-st.markdown("""
-    <style>
-    .main {
-        background-color: #f5f7f9;
-    }
-    .stButton>button {
-        width: 100%;
-        border-radius: 5px;
-        height: 3em;
-        background-color: #007bff;
-        color: white;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# 1. PAGE SETUP
+st.set_page_config(page_title="Yes Bank Predictor", layout="centered")
 
 st.title("📈 Yes Bank Stock Price Prediction")
-st.write("This app uses a Tuned ElasticNet Regression model to predict monthly closing prices.")
+st.write("Adjust the sliders below to predict the monthly closing price.")
 
-# --- LOAD MODEL & SCALER ---
-# Ensure the folder name matches your GitHub repository exactly
+# 2. LOAD ASSETS (Model & Scaler)
+# This looks into your 'My_Project' folder on GitHub
 folder = 'My_Projects'
 model_path = os.path.join(folder, 'best_yesbank_model.joblib')
 scaler_path = os.path.join(folder, 'scaler.joblib')
 
 @st.cache_resource
-def load_assets():
+def load_model_files():
     try:
         model = joblib.load(model_path)
         scaler = joblib.load(scaler_path)
         return model, scaler
     except Exception as e:
-        st.error(f"Error loading model files: {e}")
-        st.info("Check if 'My_Projects' folder exists on GitHub and contains the .joblib files.")
+        st.error(f"Could not find model files in '{folder}'. Error: {e}")
         return None, None
 
-model, scaler = load_assets()
+model, scaler = load_model_files()
 
-# --- USER INPUT SECTION ---
-if model and scaler:
-    with st.form("prediction_form"):
-        st.subheader("Enter Monthly Stock Data")
+# 3. USER INPUT SECTION (The Sliders)
+if model is not None:
+    with st.form("input_form"):
+        st.subheader("Market Indicators")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            open_p = st.number_input("Opening Price", min_value=0.0, value=180.5)
-            low_p = st.number_input("Lowest Price of Month", min_value=0.0, value=175.0)
+        # Sliders: (Label, Min Value, Max Value, Default Value)
+        open_p = st.slider("Opening Price (INR)", 0.0, 500.0, 150.0)
+        high_p = st.slider("Monthly High (INR)", 0.0, 500.0, 160.0)
+        low_p = st.slider("Monthly Low (INR)", 0.0, 500.0, 140.0)
+        prev_close = st.slider("Previous Month Close (INR)", 0.0, 500.0, 145.0)
         
-        with col2:
-            high_p = st.number_input("Highest Price of Month", min_value=0.0, value=185.2)
-            prev_close = st.number_input("Previous Month Close", min_value=0.0, value=178.0)
-        
-        # We need a dummy OHLC_Avg and Spread for the scaler
-        # even though the model will only use 4 of the 6 features.
-        submit_button = st.form_submit_button("Predict Closing Price")
+        predict_btn = st.form_submit_button("Generate Prediction")
 
-    if submit_button:
-        # 1. Log Transform the inputs (Matching Training)
-        # Using log1p to stay consistent with np.log1p
+    # 4. PREDICTION LOGIC
+    if predict_btn:
+        # Log transformation (to match training data)
         inputs_log = np.log1p([open_p, high_p, low_p, prev_close])
         
-        # 2. Reconstruct the 6 features for the Scaler
-        # Order: ['Open_log', 'High_log', 'Low_log', 'OHLC_Avg', 'Spread', 'Prev_Close']
-        ohlc_avg = np.mean(inputs_log) # Simple average of logs
-        spread = inputs_log[1] - inputs_log[2] # High_log - Low_log
+        # Feature Engineering (6 features for the scaler)
+        ohlc_avg = np.mean(inputs_log)
+        spread = inputs_log[1] - inputs_log[2]
         
+        # Combine into the order expected by Scaler
         full_features = [[inputs_log[0], inputs_log[1], inputs_log[2], ohlc_avg, spread, inputs_log[3]]]
         
-        # 3. Apply the Scaler
+        # Scale and then select the 4 features the model uses
         scaled_data = scaler.transform(full_features)
+        model_ready_data = scaled_data[:, [0, 1, 2, 5]]
         
-        # 4. Slice to select the 4 features used by the ElasticNet Model
-        # Indices: 0(Open), 1(High), 2(Low), 5(Prev_Close)
-        model_input = scaled_data[:, [0, 1, 2, 5]]
-        
-        # 5. Predict and Inverse Log
-        prediction_log = model.predict(model_input)
+        # Predict and convert back from Log scale
+        prediction_log = model.predict(model_ready_data)
         final_price = np.expm1(prediction_log)
         
-        # --- OUTPUT DISPLAY ---
-        st.divider()
+        # Show Results
         st.balloons()
-        st.subheader(f"Target Prediction: ₹{final_price[0]:.2f}")
-        st.write("Note: This prediction is based on monthly historical trends.")
-
+        st.success(f"### Predicted Closing Price: ₹{final_price[0]:.2f}")
+        
 else:
-    st.warning("Please resolve the file loading issue to proceed.")
+    st.info("Waiting for model files to load from GitHub...")
 
-# --- FOOTER ---
+# 5. FOOTER
 st.markdown("---")
-st.caption("Developed for Yes Bank Stock Analysis Project | ML Regression")
+st.caption("Note: This is an ML project for educational purposes.")
