@@ -40,7 +40,7 @@ def load_assets():
         return model, scaler
     except Exception as e:
         st.error(f"Error loading model files: {e}")
-        st.info("Check if 'My_Project' folder exists on GitHub and contains the .joblib files.")
+        st.info("Check if 'My_Projects' folder exists on GitHub and contains the .joblib files.")
         return None, None
 
 model, scaler = load_assets()
