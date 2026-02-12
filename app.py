@@ -28,7 +28,7 @@ st.write("This app uses a Tuned ElasticNet Regression model to predict monthly c
 
 # --- LOAD MODEL & SCALER ---
 # Ensure the folder name matches your GitHub repository exactly
-folder = 'My_Project'
+folder = 'My_Projects'
 model_path = os.path.join(folder, 'best_yesbank_model.joblib')
 scaler_path = os.path.join(folder, 'scaler.joblib')
 
